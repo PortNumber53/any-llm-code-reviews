@@ -1,0 +1,257 @@
+/**
+ * CLI entry point — parses args and dispatches to the appropriate mode.
+ *
+ * Modes:
+ *   --mode pr       (default) Review a GitHub pull request
+ *   --mode diff     Review a local git diff
+ *   --mode simulate Run with mock data (demo mode)
+ *
+ * Provider selection:
+ *   --provider nvidia|gemini|openai|anthropic   (or set LLM_PROVIDER env var)
+ *
+ * Model override:
+ *   --model <model-name>   (or set <PROVIDER>_MODEL env var)
+ *
+ * PR number:
+ *   --pr <number>   (or set GITHUB_PR_NUMBER env var)
+ *
+ * Target branch (for diff mode):
+ *   --target <branch>   (default: main)
+ */
+
+import { loadConfig } from './config.js';
+import { runPullRequestReview, runDiffReview } from './index.js';
+import { SEVERITY_EMOJI } from './types/reviewer.js';
+import type { ReviewResult } from './types/reviewer.js';
+
+const VALID_MODES = ['pr', 'diff', 'simulate'];
+const VALID_PROVIDERS = ['gemini', 'nvidia', 'openai', 'anthropic'];
+
+function printUsage(): void {
+  console.log(`
+niteni-multi-llm — AI code review tool with multi-LLM support
+
+Usage:
+  node dist/cli.js [options]
+
+Modes:
+  --mode pr        Review a GitHub pull request (default)
+  --mode diff      Review a local git diff
+  --mode simulate  Run with mock data (demo)
+
+Options:
+  --provider <name>    LLM provider: nvidia (default), gemini, openai, anthropic
+  --model <model>      Model name (overrides env var)
+  --pr <number>        Pull request number
+  --target <branch>    Target branch for diff mode (default: main)
+  --help               Show this help
+
+Environment Variables:
+  GITHUB_TOKEN                 GitHub PAT (required for PR mode)
+  GITHUB_REPO_OWNER            Repository owner
+  GITHUB_REPO_NAME             Repository name
+  GITHUB_PR_NUMBER             PR number (can use --pr instead)
+  LLM_PROVIDER                 Provider: nvidia, gemini, openai, anthropic
+  NVIDIA_API_KEY               NVIDIA API key
+  GEMINI_API_KEY               Google Gemini API key
+  OPENAI_API_KEY               OpenAI API key
+  ANTHROPIC_API_KEY            Anthropic API key
+  NVIDIA_MODEL                 NVIDIA model name (default: meta/llama-3.3-70b-instruct)
+  GEMINI_MODEL                 Gemini model name (default: gemini-2.0-flash)
+  OPENAI_MODEL                 OpenAI model name (default: gpt-4o)
+  ANTHROPIC_MODEL              Anthropic model name (default: claude-sonnet-4-20250514)
+  NVIDIA_BASE_URL              Custom NVIDIA API URL
+  LLM_TEMPERATURE              Temperature (default: 0.2)
+  LLM_MAX_TOKENS               Max output tokens (default: 8192)
+  REVIEW_MAX_FILES             Max files to review (default: 50)
+  REVIEW_MAX_DIFF_SIZE         Max diff size in chars (default: 100000)
+  REVIEW_INCLUDE_PATTERNS      Comma-separated globs to include
+  REVIEW_EXCLUDE_PATTERNS      Comma-separated globs to exclude
+  REVIEW_POST_AS_COMMENT       Post review as comment (default: true)
+  REVIEW_FAIL_ON_CRITICAL      Exit 1 on CRITICAL (default: false)
+
+Examples:
+  # Review PR #42 with NVIDIA Llama
+  NVIDIA_API_KEY=... GITHUB_TOKEN=... \\
+  GITHUB_REPO_OWNER=myorg GITHUB_REPO_NAME=myrepo \\
+  node dist/cli.js --mode pr --provider nvidia --pr 42
+
+  # Review local diff with OpenAI
+  OPENAI_API_KEY=... node dist/cli.js --mode diff --provider openai --target main
+
+  # Demo mode (no API keys needed)
+  node dist/cli.js --mode simulate
+`);
+}
+
+function parseArgs(): Record<string, string | boolean> {
+  const args: Record<string, string | boolean> = {};
+  const argv = process.argv.slice(2);
+
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--help' || arg === '-h') {
+      args.help = true;
+    } else if (arg.startsWith('--')) {
+      const key = arg.slice(2);
+      const nextArg = argv[i + 1];
+      if (nextArg && !nextArg.startsWith('--')) {
+        args[key] = nextArg;
+        i++;
+      } else {
+        args[key] = true;
+      }
+    }
+  }
+
+  return args;
+}
+
+async function runSimulate(): Promise<ReviewResult> {
+  console.log('\n╔══════════════════════════════════════════════╗');
+  console.log('║   niteni-multi-llm — Simulation Mode        ║');
+  console.log('╚══════════════════════════════════════════════╝\n');
+
+  const mockFindings = [
+    {
+      severity: 'CRITICAL' as const,
+      file: 'src/auth/jwt.ts',
+      line: 42,
+      description: 'JWT secret is hardcoded in source code. This exposes the secret to anyone with repository access.',
+      suggestion: 'Move the secret to an environment variable:\n  const secret = process.env.JWT_SECRET;',
+      rationale: 'Hardcoded secrets are a security vulnerability that can lead to token forgery.',
+    },
+    {
+      severity: 'HIGH' as const,
+      file: 'src/api/users.ts',
+      line: 118,
+      description: 'SQL query uses string concatenation instead of parameterized queries.',
+      suggestion: 'Use parameterized query:\n  db.query("SELECT * FROM users WHERE id = $1", [userId])',
+      rationale: 'String concatenation is vulnerable to SQL injection attacks.',
+    },
+    {
+      severity: 'MEDIUM' as const,
+      file: 'src/utils/validate.ts',
+      line: 25,
+      description: 'Email validation regex does not handle all valid email formats (e.g., plus addressing).',
+      suggestion: 'Use a well-tested regex or the built-in URL API for validation.',
+    },
+    {
+      severity: 'LOW' as const,
+      file: 'README.md',
+      line: 10,
+      description: 'API endpoint documentation is missing the new /health endpoint.',
+      suggestion: 'Add documentation for the /health endpoint.',
+    },
+  ];
+
+  const mockResult: ReviewResult = {
+    summary: 'Reviewed 8 files with 4 findings (1 CRITICAL, 1 HIGH, 1 MEDIUM, 1 LOW). The critical finding involves a hardcoded JWT secret that must be addressed before merge.',
+    findings: mockFindings,
+    hasCritical: true,
+    provider: 'simulate',
+    model: 'mock-v1',
+  };
+
+  // Print with color
+  const RESET = '\x1b[0m';
+  const BOLD = '\x1b[1m';
+  const DIM = '\x1b[2m';
+  const RED = '\x1b[31m';
+  const YELLOW = '\x1b[33m';
+  const BLUE = '\x1b[34m';
+  const WHITE = '\x1b[37m';
+
+  console.log(`${BOLD}Review Summary${RESET}`);
+  console.log(mockResult.summary);
+  console.log('');
+
+  for (const finding of mockResult.findings) {
+    const colors: Record<string, string> = {
+      CRITICAL: RED,
+      HIGH: YELLOW,
+      MEDIUM: BLUE,
+      LOW: WHITE,
+    };
+    const color = colors[finding.severity] || WHITE;
+    const emoji = SEVERITY_EMOJI[finding.severity];
+
+    console.log(`${color}${emoji} ${BOLD}${finding.severity}${RESET} ${finding.file}:${finding.line}`);
+    console.log(`  ${finding.description}`);
+    if (finding.suggestion) {
+      console.log(`  ${DIM}Suggestion: ${finding.suggestion}${RESET}`);
+    }
+    console.log('');
+  }
+
+  return mockResult;
+}
+
+async function main(): Promise<void> {
+  const args = parseArgs();
+
+  if (args.help) {
+    printUsage();
+    process.exit(0);
+  }
+
+  const mode = (args.mode as string) || 'pr';
+
+  if (!VALID_MODES.includes(mode)) {
+    console.error(`Error: Invalid mode "${mode}". Valid modes: ${VALID_MODES.join(', ')}`);
+    printUsage();
+    process.exit(1);
+  }
+
+  // Handle simulate mode separately (no config needed)
+  if (mode === 'simulate') {
+    const result = await runSimulate();
+    if (result.hasCritical && args.failOnCritical) {
+      process.exit(1);
+    }
+    process.exit(0);
+  }
+
+  // Load config
+  try {
+    const config = loadConfig(args);
+    let result: ReviewResult;
+
+    if (mode === 'pr') {
+      result = await runPullRequestReview(config);
+    } else {
+      const target = (args.target as string) || 'main';
+      result = await runDiffReview(config, target);
+    }
+
+    // Print result
+    console.log('\n═══════════════════════════════════════');
+    console.log(`Provider: ${result.provider} / Model: ${result.model}`);
+    console.log(`Findings: ${result.findings.length}`);
+    console.log(`Critical: ${result.hasCritical ? 'YES' : 'no'}`);
+    console.log('═══════════════════════════════════════\n');
+
+    console.log(result.summary);
+
+    for (const finding of result.findings) {
+      const emoji = SEVERITY_EMOJI[finding.severity];
+      console.log(`\n${emoji} ${finding.severity} — ${finding.file}:${finding.line}`);
+      console.log(`  ${finding.description}`);
+      if (finding.suggestion) {
+        console.log(`  Suggestion: ${finding.suggestion}`);
+      }
+    }
+
+    if (result.hasCritical && config.review.failOnCritical) {
+      console.error('\n❌ CRITICAL findings detected. Failing.');
+      process.exit(1);
+    }
+
+    process.exit(0);
+  } catch (err) {
+    console.error('Error:', err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+}
+
+main();

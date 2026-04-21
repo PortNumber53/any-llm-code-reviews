@@ -1,0 +1,71 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    # Only run if the PR has changes (skip if just labels/assignees changed)
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better diff context
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies and build
+        run: npm ci && npm run build
+
+      - name: Run AI Code Review
+        env:
+          # GitHub token (auto-provided in Actions)
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPO_NAME: ${{ github.event.repository.name }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+
+          # LLM Provider — choose one by setting the API key
+          # Option 1: NVIDIA NIM (recommended — best cost/performance)
+          LLM_PROVIDER: nvidia
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NVIDIA_MODEL: meta/llama-3.3-70b-instruct
+
+          # Option 2: Google Gemini
+          # LLM_PROVIDER: gemini
+          # GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # GEMINI_MODEL: gemini-2.0-flash
+
+          # Option 3: OpenAI
+          # LLM_PROVIDER: openai
+          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # OPENAI_MODEL: gpt-4o
+
+          # Option 4: Anthropic
+          # LLM_PROVIDER: anthropic
+          # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # ANTHROPIC_MODEL: claude-sonnet-4-20250514
+
+          # Review settings
+          LLM_TEMPERATURE: '0.2'
+          LLM_MAX_TOKENS: '8192'
+          REVIEW_MAX_FILES: '50'
+          REVIEW_MAX_DIFF_SIZE: '100000'
+          REVIEW_POST_AS_COMMENT: 'true'
+          REVIEW_FAIL_ON_CRITICAL: 'false'
+        run: node dist/cli.js --mode pr
+
+      - name: Summary
+        if: always()
+        run: echo "AI code review completed."

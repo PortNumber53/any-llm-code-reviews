@@ -1,0 +1,131 @@
+/**
+ * Configuration — parses environment variables and CLI args into typed config.
+ *
+ * All config via env vars with sensible defaults.
+ * CLI args (--mode, --provider, etc.) override env vars.
+ */
+
+import type { AppConfig, LLMProvider } from './types/config.js';
+
+const VALID_PROVIDERS: LLMProvider[] = ['gemini', 'nvidia', 'openai', 'anthropic'];
+
+/**
+ * Default model names per provider.
+ */
+const DEFAULT_MODELS: Record<LLMProvider, string> = {
+  gemini: 'gemini-2.0-flash',
+  nvidia: 'meta/llama-3.3-70b-instruct',
+  openai: 'gpt-4o',
+  anthropic: 'claude-sonnet-4-20250514',
+};
+
+/**
+ * Default API base URLs per provider.
+ */
+const DEFAULT_BASE_URLS: Record<LLMProvider, string> = {
+  gemini: 'https://generativelanguage.googleapis.com/v1beta',
+  nvidia: 'https://integrate.api.nvidia.com/v1',
+  openai: 'https://api.openai.com/v1',
+  anthropic: 'https://api.anthropic.com/v1',
+};
+
+/**
+ * Parse and validate config from environment variables and CLI args.
+ */
+export function loadConfig(cliArgs: Record<string, string | boolean>): AppConfig {
+  const provider = (cliArgs.provider as string || env('LLM_PROVIDER') || 'nvidia') as LLMProvider;
+  if (!VALID_PROVIDERS.includes(provider)) {
+    throw new Error(
+      `Invalid LLM provider: ${provider}. Valid: ${VALID_PROVIDERS.join(', ')}`
+    );
+  }
+
+  // Resolve API key based on provider
+  const apiKey = resolveApiKey(provider);
+
+  // Parse GitHub context
+  const github = {
+    token: requiredEnv('GITHUB_TOKEN'),
+    baseUrl: env('GITHUB_API_URL') || 'https://api.github.com',
+    owner: requiredEnv('GITHUB_REPO_OWNER'),
+    repo: requiredEnv('GITHUB_REPO_NAME'),
+    pullNumber: parseInt((cliArgs.pr as string) || requiredEnv('GITHUB_PR_NUMBER'), 10),
+  };
+
+  // Parse LLM config
+  const llm = {
+    provider,
+    apiKey,
+    model: (cliArgs.model as string) || env(`${provider.toUpperCase()}_MODEL`) || DEFAULT_MODELS[provider],
+    baseUrl: env(`${provider.toUpperCase()}_BASE_URL`) || DEFAULT_BASE_URLS[provider],
+    temperature: parseFloat(env('LLM_TEMPERATURE') || '0.2'),
+    maxTokens: parseInt(env('LLM_MAX_TOKENS') || '8192', 10),
+  };
+
+  // Parse review config
+  const review = {
+    maxFiles: parseInt(env('REVIEW_MAX_FILES') || '50', 10),
+    maxDiffSize: parseInt(env('REVIEW_MAX_DIFF_SIZE') || '100000', 10),
+    includePatterns: parsePatterns(env('REVIEW_INCLUDE_PATTERNS') || ''),
+    excludePatterns: parsePatterns(
+      env('REVIEW_EXCLUDE_PATTERNS') ||
+        'package-lock.json,yarn.lock,pnpm-lock.yaml,*.min.js,*.min.css,.min.*,vendor/*,dist/*,build/*'
+    ),
+    postAsComment: env('REVIEW_POST_AS_COMMENT') !== 'false',
+    failOnCritical: env('REVIEW_FAIL_ON_CRITICAL') === 'true',
+  };
+
+  return { github, llm, review };
+}
+
+/**
+ * Resolve API key for the given provider.
+ * Checks provider-specific env var first, then generic fallbacks.
+ */
+function resolveApiKey(provider: LLMProvider): string {
+  const providerKeyMap: Record<LLMProvider, string[]> = {
+    gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+    nvidia: ['NVIDIA_API_KEY', 'NIM_API_KEY'],
+    openai: ['OPENAI_API_KEY'],
+    anthropic: ['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'],
+  };
+
+  for (const key of providerKeyMap[provider]) {
+    const value = env(key);
+    if (value) return value;
+  }
+
+  throw new Error(
+    `Missing API key for provider ${provider}. ` +
+    `Set one of: ${providerKeyMap[provider].join(', ')}`
+  );
+}
+
+/**
+ * Get environment variable (returns undefined if empty).
+ */
+function env(name: string): string | undefined {
+  const value = process.env[name];
+  return value && value.length > 0 ? value : undefined;
+}
+
+/**
+ * Get required environment variable (throws if missing).
+ */
+function requiredEnv(name: string): string {
+  const value = env(name);
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+/**
+ * Parse comma-separated glob patterns.
+ */
+function parsePatterns(input: string): string[] {
+  return input
+    .split(',')
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+}

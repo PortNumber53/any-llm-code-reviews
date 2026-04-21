@@ -1,0 +1,25 @@
+{
+  "name": "any-llm-code-reviews",
+  "version": "0.1.0",
+  "description": "AI-powered code review tool for GitHub PRs with multi-LLM support (NVIDIA, Gemini, OpenAI, Anthropic)",
+  "main": "dist/cli.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "review": "node dist/cli.js --mode pr"
+  },
+  "keywords": [
+    "code-review",
+    "ai",
+    "nvidia",
+    "gemini",
+    "openai",
+    "github"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}

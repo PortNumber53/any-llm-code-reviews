@@ -1,93 +1,168 @@
-# Any-LLM code reviews
+# any-llm-code-reviews
 
+AI-powered code review tool for GitHub pull requests with multi-LLM support.
+Replicates [niteni](https://github.com/denyherianto/niteni)'s clean architecture,
+extended to support **NVIDIA NIM**, Google **Gemini**, **OpenAI**, and **Anthropic Claude**.
 
+The name _niteni_ comes from Javanese meaning "to observe carefully."
 
-## Getting started
+## Features
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+- **4 LLM providers** — NVIDIA NIM (default), Gemini, OpenAI, Anthropic
+- **Structured output** — JSON schema enforcement for reliable findings
+- **Inline comments** — Posts findings with severity, file, line, and suggestions
+- **Diff filtering** — Include/exclude glob patterns, size limits
+- **Auto-cleanup** — Removes old bot comments before posting new review
+- **Zero dependencies** — Only Node.js built-in modules (https, child_process, fs, path)
+- **3 review modes** — GitHub PR review, local diff review, simulation demo
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## Quick Start
 
-## Add your files
+### 1. Install
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+```bash
+git clone <repo-url>
+cd niteni-multi-llm
+npm ci && npm run build
+```
+
+### 2. Run locally
+
+```bash
+# Simulation mode (no API keys needed)
+node dist/cli.js --mode simulate
+
+# Local diff review with NVIDIA
+NVIDIA_API_KEY=nvapi-xxx node dist/cli.js --mode diff --provider nvidia --target main
+
+# GitHub PR review
+GITHUB_TOKEN=ghp_xxx \
+GITHUB_REPO_OWNER=myorg \
+GITHUB_REPO_NAME=myrepo \
+NVIDIA_API_KEY=nvapi-xxx \
+node dist/cli.js --mode pr --pr 42
+```
+
+### 3. Add to GitHub Actions
+
+Copy `.github/workflows/ai-review.yml` to your repo.
+Add your API key as a repository secret (e.g., `NVIDIA_API_KEY`).
+
+## Supported LLM Providers
+
+| Provider   | Default Model                      | API Key Env Var      | Base URL                                       |
+|------------|------------------------------------|----------------------|------------------------------------------------|
+| NVIDIA     | `meta/llama-3.3-70b-instruct`     | `NVIDIA_API_KEY`     | `https://integrate.api.nvidia.com/v1`           |
+| Gemini     | `gemini-2.0-flash`                | `GEMINI_API_KEY`     | `https://generativelanguage.googleapis.com/v1beta` |
+| OpenAI     | `gpt-4o`                          | `OPENAI_API_KEY`     | `https://api.openai.com/v1`                     |
+| Anthropic  | `claude-sonnet-4-20250514`        | `ANTHROPIC_API_KEY`  | `https://api.anthropic.com/v1`                  |
+
+### NVIDIA Models
+
+NVIDIA NIM provides access to open-source models via an OpenAI-compatible API:
+
+- `meta/llama-3.3-70b-instruct` — Best general-purpose
+- `meta/llama-3.1-405b-instruct` — Largest, most capable
+- `mistralai/mixtral-8x22b-instruct-v0.1` — Fast MoE architecture
+- `nvidia/nemotron-4-340b-instruct` — NVIDIA's own model
+
+### Custom Base URLs
+
+Override the API base URL for self-hosted or proxy endpoints:
+
+```bash
+NVIDIA_BASE_URL=https://my-nim-proxy.example.com/v1
+```
+
+## CLI Reference
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/serious-hosting/any-llm-code-reviews.git
-git branch -M master
-git push -uf origin master
+niteni-multi-llm — AI code review tool with multi-LLM support
+
+Usage:
+  node dist/cli.js [options]
+
+Modes:
+  --mode pr        Review a GitHub pull request (default)
+  --mode diff      Review a local git diff
+  --mode simulate  Run with mock data (demo)
+
+Options:
+  --provider <name>    LLM provider: nvidia (default), gemini, openai, anthropic
+  --model <model>      Model name (overrides env var)
+  --pr <number>        Pull request number
+  --target <branch>    Target branch for diff mode (default: main)
+  --help               Show this help
 ```
 
-## Integrate with your tools
+## Environment Variables
 
-* [Set up project integrations](https://gitlab.com/serious-hosting/any-llm-code-reviews/-/settings/integrations)
+| Variable                       | Default  | Description                              |
+|--------------------------------|----------|------------------------------------------|
+| `GITHUB_TOKEN`                 | Required | GitHub PAT (for PR mode)                 |
+| `GITHUB_REPO_OWNER`            | Required | Repository owner                         |
+| `GITHUB_REPO_NAME`             | Required | Repository name                          |
+| `GITHUB_PR_NUMBER`             | Required | PR number (can use `--pr`)               |
+| `LLM_PROVIDER`                 | `nvidia` | Provider: nvidia, gemini, openai, anthropic |
+| `NVIDIA_API_KEY`               | —        | NVIDIA API key                           |
+| `GEMINI_API_KEY`               | —        | Google Gemini API key                    |
+| `OPENAI_API_KEY`               | —        | OpenAI API key                           |
+| `ANTHROPIC_API_KEY`            | —        | Anthropic API key                        |
+| `LLM_TEMPERATURE`              | `0.2`    | Generation temperature                   |
+| `LLM_MAX_TOKENS`               | `8192`   | Max output tokens                        |
+| `REVIEW_MAX_FILES`             | `50`     | Max files to review                      |
+| `REVIEW_MAX_DIFF_SIZE`         | `100000` | Max diff size in chars                   |
+| `REVIEW_INCLUDE_PATTERNS`      | —        | Comma-separated globs to include         |
+| `REVIEW_EXCLUDE_PATTERNS`      | *(see)*  | Comma-separated globs to exclude         |
+| `REVIEW_POST_AS_COMMENT`       | `true`   | Post review as PR comment                |
+| `REVIEW_FAIL_ON_CRITICAL`      | `false`  | Exit 1 on CRITICAL findings              |
 
-## Collaborate with your team
+## Severity Levels
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+| Level    | Emoji | Examples                                        |
+|----------|-------|-------------------------------------------------|
+| CRITICAL |  Red  | Security vulnerabilities, data loss, logic failures |
+| HIGH     | Orange| Performance issues, functional bugs             |
+| MEDIUM   | Blue  | Validation gaps, error handling                 |
+| LOW      | White | Documentation, style, readability               |
 
-## Test and Deploy
+## How It Works
 
-Use the built-in continuous integration in GitLab.
+1. **Fetch** — Gets PR metadata and changed file patches from GitHub API
+2. **Filter** — Applies include/exclude patterns and enforces diff size limit
+3. **Review** — Sends filtered diff to LLM with structured JSON output schema
+4. **Validate** — Checks all findings have required fields (severity, file, line, description)
+5. **Post** — Cleans up old bot comments, posts new review summary to PR
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+## Architecture
 
-***
+```
+src/
+  cli.ts              Entry point — arg parsing, mode dispatch
+  config.ts           Env var parsing and validation
+  index.ts            Orchestration — PR review and diff review flows
+  reviewer.ts         Diff filtering and finding validation
+  github-api.ts       GitHub REST API client (zero dep)
+  http.ts             HTTPS request helper (zero dep)
+  types/              TypeScript type definitions
+    config.ts         AppConfig, LLMConfig, etc.
+    github.ts         PR, file, comment types
+    reviewer.ts       Finding, severity, review result types
+    llm.ts            LLM provider interface, schema, prompt
+  providers/          LLM provider implementations
+    nvidia.ts         NVIDIA NIM (OpenAI-compatible)
+    gemini.ts         Google Gemini REST API
+    openai.ts         OpenAI chat completions
+    anthropic.ts      Anthropic Messages API with tool use
+    index.ts          Provider factory
+```
 
-# Editing this README
+## Credits
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+- Inspired by [niteni](https://github.com/denyherianto/niteni) by Deny Herianto
+- Extended with NVIDIA NIM support and multi-provider architecture
+- Name: _niteni_ (Javanese) — "to observe carefully"
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+MIT

@@ -13,7 +13,10 @@
  *   --provider nvidia|gemini|openai|anthropic   (or set LLM_PROVIDER env var)
  *
  * Model override:
- *   --model <model-name>   (or set <PROVIDER>_MODEL env var)
+ *   --model <model-name>   Auto-detects provider from model name when possible.
+ *                          Known prefixes: claude-xxx (anthropic), gpt-xxx/o1/o3-xxx (openai),
+ *                          gemini-xxx (gemini), meta/xxx/mistralai/xxx/deepseek-ai/xxx (nvidia).
+ *                          If the model name is not recognized, falls back to --provider / LLM_PROVIDER.
  *
  * PR number (GitHub):
  *   --pr <number>   (or set GITHUB_PR_NUMBER env var)
@@ -49,11 +52,17 @@ Modes:
 Options:
   --platform <name>   Platform: github (default), gitlab
   --provider <name>   LLM provider: nvidia (default), gemini, openai, anthropic
-  --model <model>     Model name (overrides env var)
+  --model <model>     Model name (auto-detects provider; overrides env var)
   --pr <number>       Pull request number (GitHub)
   --mr <iid>          Merge request IID (GitLab)
   --target <branch>   Target branch for diff mode (default: main)
   --help              Show this help
+
+Model Auto-Detection (--model auto-selects provider):
+  NVIDIA:    meta/*, mistralai/*, deepseek-ai/*, nvidia/*
+  Gemini:    gemini-*
+  OpenAI:    gpt-*, o1, o3-*, chatgpt-*
+  Anthropic: claude-*
 
 Environment Variables (GitHub):
   GITHUB_TOKEN                 GitHub PAT (required for PR mode on GitHub)
@@ -99,6 +108,10 @@ Examples:
   OPENAI_API_KEY=... GITLAB_TOKEN=... \\
   GITLAB_NAMESPACE=myorg GITLAB_PROJECT=myrepo \\
   node dist/cli.js --mode pr --platform gitlab --provider openai --mr 7
+
+  # Model auto-detection (provider inferred from model name)
+  ANTHROPIC_API_KEY=... node dist/cli.js --mode pr --model claude-sonnet-4-20250514 --pr 42
+  OPENAI_API_KEY=... node dist/cli.js --mode pr --model gpt-4o-mini --pr 42
 
   # Review local diff with OpenAI
   OPENAI_API_KEY=... node dist/cli.js --mode diff --provider openai --target main

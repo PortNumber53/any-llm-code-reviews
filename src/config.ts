@@ -21,6 +21,25 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
 };
 
 /**
+ * Detect provider from model name.
+ * Allows --model to auto-select the correct provider.
+ *
+ * Patterns:
+ *   nvidia:    meta/*, mistralai/*, deepseek-ai/*, nvidia/*
+ *   gemini:    gemini-*
+ *   openai:    gpt-*, o1, o3-*, chatgpt-*, text-*, davinci-*
+ *   anthropic: claude-*
+ */
+function detectProviderFromModel(model: string): LLMProvider | null {
+  if (/^(meta|mistralai|deepseek-ai|nvidia)\//i.test(model)) return 'nvidia';
+  if (/^gemini/i.test(model)) return 'gemini';
+  if (/^(gpt|o[13]|chatgpt|text|davinci)/i.test(model)) return 'openai';
+  if (/^claude/i.test(model)) return 'anthropic';
+  // Unknown model name — fall through to --provider / LLM_PROVIDER / default
+  return null;
+}
+
+/**
  * Default API base URLs per provider.
  */
 const DEFAULT_BASE_URLS: Record<LLMProvider, string> = {
@@ -34,7 +53,17 @@ const DEFAULT_BASE_URLS: Record<LLMProvider, string> = {
  * Parse and validate config from environment variables and CLI args.
  */
 export function loadConfig(cliArgs: Record<string, string | boolean>): AppConfig {
-  const provider = (cliArgs.provider as string || env('LLM_PROVIDER') || 'nvidia') as LLMProvider;
+  // If --model is provided, try to auto-detect provider from model name
+  const modelArg = cliArgs.model as string | undefined;
+  const detectedProvider = modelArg ? detectProviderFromModel(modelArg) : null;
+
+  if (modelArg && detectedProvider === null) {
+    console.warn(`[config] Could not auto-detect provider from model "${modelArg}". ` +
+      `Falling back to --provider / LLM_PROVIDER. ` +
+      `Use --provider to specify explicitly.`);
+  }
+
+  const provider = (detectedProvider || cliArgs.provider as string || env('LLM_PROVIDER') || 'nvidia') as LLMProvider;
   if (!VALID_PROVIDERS.includes(provider)) {
     throw new Error(
       `Invalid LLM provider: ${provider}. Valid: ${VALID_PROVIDERS.join(', ')}`
@@ -88,7 +117,7 @@ export function loadConfig(cliArgs: Record<string, string | boolean>): AppConfig
   const llm = {
     provider,
     apiKey,
-    model: (cliArgs.model as string) || env(`${provider.toUpperCase()}_MODEL`) || DEFAULT_MODELS[provider],
+    model: modelArg || env(`${provider.toUpperCase()}_MODEL`) || DEFAULT_MODELS[provider],
     baseUrl: env(`${provider.toUpperCase()}_BASE_URL`) || DEFAULT_BASE_URLS[provider],
     temperature: parseFloat(env('LLM_TEMPERATURE') || '0.2'),
     maxTokens: parseInt(env('LLM_MAX_TOKENS') || '8192', 10),

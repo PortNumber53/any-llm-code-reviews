@@ -26,6 +26,13 @@
  *
  * Target branch (for diff mode):
  *   --target <branch>   (default: main)
+ *
+ * Vibe review (auto-apply fixes):
+ *   --vibe-review                Enable automatic application of suggested fixes
+ *                                Sets VIBE_REVIEW=true. Focuses on fixing issues only,
+ *                                not adding new features.
+ *   --vibe-review-prompt <path>  Custom prompt for vibe review. Can be a file path
+ *                                or raw prompt string. Falls back to built-in default.
  */
 
 import { loadConfig } from './config.js';
@@ -50,13 +57,15 @@ Modes:
   --mode simulate  Run with mock data (demo)
 
 Options:
-  --platform <name>   Platform: github (default), gitlab
-  --provider <name>   LLM provider: nvidia (default), gemini, openai, anthropic
-  --model <model>     Model name (auto-detects provider; overrides env var)
-  --pr <number>       Pull request number (GitHub)
-  --mr <iid>          Merge request IID (GitLab)
-  --target <branch>   Target branch for diff mode (default: main)
-  --help              Show this help
+  --platform <name>            Platform: github (default), gitlab
+  --provider <name>            LLM provider: nvidia (default), gemini, openai, anthropic
+  --model <model>              Model name (auto-detects provider; overrides env var)
+  --pr <number>                Pull request number (GitHub)
+  --mr <iid>                   Merge request IID (GitLab)
+  --target <branch>            Target branch for diff mode (default: main)
+  --vibe-review                Auto-apply suggested fixes (focus on fixing, no new features)
+  --vibe-review-prompt <path>  Custom vibe review prompt (file path or raw string)
+  --help                       Show this help
 
 Model Auto-Detection (--model auto-selects provider):
   NVIDIA:    meta/*, mistralai/*, deepseek-ai/*, nvidia/*
@@ -97,6 +106,8 @@ Environment Variables (LLM):
   REVIEW_EXCLUDE_PATTERNS      Comma-separated globs to exclude
   REVIEW_POST_AS_COMMENT       Post review as comment (default: true)
   REVIEW_FAIL_ON_CRITICAL      Exit 1 on CRITICAL (default: false)
+  VIBE_REVIEW                  Auto-apply fixes: true, 1, yes, on (default: false)
+  VIBE_REVIEW_PROMPT           Custom vibe review prompt string (optional)
 
 Examples:
   # Review GitHub PR #42 with NVIDIA Llama
@@ -157,6 +168,8 @@ async function runSimulate(): Promise<ReviewResult> {
       description: 'JWT secret is hardcoded in source code. This exposes the secret to anyone with repository access.',
       suggestion: 'Move the secret to an environment variable:\n  const secret = process.env.JWT_SECRET;',
       rationale: 'Hardcoded secrets are a security vulnerability that can lead to token forgery.',
+      original: "const secret = 'my-super-secret-jwt-key';",
+      replacement: "const secret = process.env.JWT_SECRET;",
     },
     {
       severity: 'HIGH' as const,
@@ -165,6 +178,8 @@ async function runSimulate(): Promise<ReviewResult> {
       description: 'SQL query uses string concatenation instead of parameterized queries.',
       suggestion: 'Use parameterized query:\n  db.query("SELECT * FROM users WHERE id = $1", [userId])',
       rationale: 'String concatenation is vulnerable to SQL injection attacks.',
+      original: 'db.query("SELECT * FROM users WHERE id = " + userId)',
+      replacement: 'db.query("SELECT * FROM users WHERE id = $1", [userId])',
     },
     {
       severity: 'MEDIUM' as const,

@@ -15,6 +15,10 @@ export interface Finding {
   suggestion?: string;
   /** Why this is an issue (optional) */
   rationale?: string;
+  /** Exact original code to be replaced (required for vibe review auto-apply) */
+  original?: string;
+  /** Exact replacement code (required for vibe review auto-apply) */
+  replacement?: string;
 }
 
 export interface StructuredReviewResponse {

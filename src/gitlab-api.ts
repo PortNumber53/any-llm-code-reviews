@@ -29,9 +29,14 @@ export class GitLabApiClient {
     return this.config.baseUrl || 'https://gitlab.com/api/v4';
   }
 
+  private get isJobToken(): boolean {
+    return this.config.token === process.env.CI_JOB_TOKEN;
+  }
+
   private get headers(): Record<string, string> {
+    // CI job tokens use Job-Token header; PATs use Private-Token
     return {
-      'Private-Token': this.config.token,
+      [this.isJobToken ? 'Job-Token' : 'Private-Token']: this.config.token,
       'Content-Type': 'application/json',
     };
   }
@@ -72,6 +77,17 @@ export class GitLabApiClient {
       } catch {
         // Use raw body as message
       }
+
+      // CI_JOB_TOKEN cannot access the merge requests REST API — suggest PAT
+      if (response.statusCode === 404 && this.isJobToken) {
+        const hint =
+          `\n\n[gitlab] HINT: CI_JOB_TOKEN has limited API access and often cannot read merge requests.\n` +
+          `       Create a GitLab Personal Access Token (PAT) or Project Access Token with 'api' scope,\n` +
+          `       and add it as a protected CI/CD variable named GITLAB_TOKEN in your project settings.\n` +
+          `       The tool will use GITLAB_TOKEN before falling back to CI_JOB_TOKEN.`;
+        throw new Error(`GitLab API error ${response.statusCode}: ${error.message}${hint}`);
+      }
+
       throw new Error(`GitLab API error ${response.statusCode}: ${error.message}`);
     }
 
@@ -86,10 +102,9 @@ export class GitLabApiClient {
    * Fetch merge request metadata.
    */
   async getMergeRequest(): Promise<MergeRequest> {
-    return this.apiRequest<MergeRequest>(
-      'GET',
-      `/projects/${this.projectPath}/merge_requests/${this.config.mergeRequestIid}`
-    );
+    const endpoint = `/projects/${this.projectPath}/merge_requests/${this.config.mergeRequestIid}`;
+    console.log(`[gitlab] GET ${this.baseUrl}${endpoint}`);
+    return this.apiRequest<MergeRequest>('GET', endpoint);
   }
 
   /**

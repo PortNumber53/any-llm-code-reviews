@@ -6,6 +6,7 @@
  */
 
 import type { AppConfig, LLMProvider, Platform } from './types/config.js';
+import { readFileSync } from 'node:fs';
 
 const VALID_PROVIDERS: LLMProvider[] = ['gemini', 'nvidia', 'openai', 'anthropic'];
 const VALID_PLATFORMS: Platform[] = ['github', 'gitlab'];
@@ -94,13 +95,17 @@ export function loadConfig(cliArgs: Record<string, string | boolean>): AppConfig
       pullNumber: parseInt((cliArgs.pr as string) || requiredEnv('GITHUB_PR_NUMBER'), 10),
     };
   } else {
+    const token = env('GITLAB_TOKEN') || env('CI_JOB_TOKEN') || '';
     gitlab = {
-      token: env('GITLAB_TOKEN') || env('CI_JOB_TOKEN') || '',
+      token,
       baseUrl: env('GITLAB_API_URL') || env('CI_API_V4_URL') || 'https://gitlab.com/api/v4',
       namespace: env('GITLAB_NAMESPACE') || env('CI_PROJECT_NAMESPACE') || '',
       project: env('GITLAB_PROJECT') || env('CI_PROJECT_NAME') || '',
       mergeRequestIid: parseInt((cliArgs.mr as string) || env('GITLAB_MR_IID') || env('CI_MERGE_REQUEST_IID') || '0', 10),
     };
+
+    const tokenSource = env('GITLAB_TOKEN') ? 'GITLAB_TOKEN' : (env('CI_JOB_TOKEN') ? 'CI_JOB_TOKEN' : 'none');
+    console.log(`[config] GitLab token source: ${tokenSource}`);
 
     if (!gitlab.token) {
       throw new Error('Missing GitLab token. Set GITLAB_TOKEN or run in GitLab CI (CI_JOB_TOKEN is auto-provided).');
@@ -134,6 +139,8 @@ export function loadConfig(cliArgs: Record<string, string | boolean>): AppConfig
     ),
     postAsComment: env('REVIEW_POST_AS_COMMENT') !== 'false',
     failOnCritical: env('REVIEW_FAIL_ON_CRITICAL') === 'true',
+    vibeReview: isTruthy(env('VIBE_REVIEW')) || cliArgs['vibe-review'] === true,
+    vibeReviewPrompt: loadVibeReviewPrompt(cliArgs),
   };
 
   return { platform, github, gitlab, llm, review };
@@ -163,8 +170,12 @@ function resolveApiKey(provider: LLMProvider): string {
 }
 
 /**
- * Get environment variable (returns undefined if empty).
+ * Check if an env var value is truthy (true, 1, yes, on).
  */
+function isTruthy(value: string | undefined): boolean {
+  if (!value) return false;
+  return ['true', '1', 'yes', 'on'].includes(value.toLowerCase().trim());
+}
 function env(name: string): string | undefined {
   const value = process.env[name];
   return value && value.length > 0 ? value : undefined;
@@ -179,6 +190,30 @@ function requiredEnv(name: string): string {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
+}
+
+/**
+ * Load custom vibe review prompt from env var or CLI arg.
+ * CLI arg `--vibe-review-prompt` can be a file path (read) or raw string.
+ * Env var `VIBE_REVIEW_PROMPT` is treated as raw string.
+ */
+function loadVibeReviewPrompt(cliArgs: Record<string, string | boolean>): string | undefined {
+  const envPrompt = env('VIBE_REVIEW_PROMPT');
+  const argPrompt = cliArgs['vibe-review-prompt'] as string | undefined;
+
+  const raw = argPrompt || envPrompt;
+  if (!raw) return undefined;
+
+  // If it looks like a file path, try reading it
+  if (raw.includes('/') || raw.includes('\\') || raw.endsWith('.txt') || raw.endsWith('.md')) {
+    try {
+      return readFileSync(raw, 'utf-8');
+    } catch {
+      // Not a readable file — fall through to treat as raw prompt string
+    }
+  }
+
+  return raw;
 }
 
 /**

@@ -65,6 +65,8 @@ export const RESPONSE_SCHEMA = {
           description: { type: 'string', description: 'Description of the issue' },
           suggestion: { type: 'string', description: 'Suggested fix (optional)' },
           rationale: { type: 'string', description: 'Why this is an issue (optional)' },
+          original: { type: 'string', description: 'Exact original code to be replaced (required for vibe review)' },
+          replacement: { type: 'string', description: 'Exact replacement code (required for vibe review)' },
         },
         required: ['severity', 'file', 'line', 'description'],
       },
@@ -104,6 +106,48 @@ Return ONLY a JSON object matching this exact structure:
       "description": "What the issue is",
       "suggestion": "Optional: how to fix it",
       "rationale": "Optional: why this matters"
+    }
+  ]
+}`;
+
+/**
+ * Vibe review prompt — generates actual code replacements for auto-apply.
+ * Strictly focuses on fixing issues, not adding features.
+ */
+export const VIBE_REVIEW_PROMPT = `You are a Principal Software Engineer in VIBE REVIEW mode.
+Your job is to automatically fix issues in the code diff by producing exact replacements.
+
+## Severity Levels
+- **CRITICAL**: Security vulnerabilities, data loss, logic failures that could crash production
+- **HIGH**: Performance bottlenecks, architectural violations, functional bugs
+- **MEDIUM**: Input validation gaps, error handling issues, naming problems
+- **LOW**: Documentation improvements, minor readability issues, style suggestions
+
+## Vibe Review Rules
+- ONLY fix actual issues (bugs, security, performance, correctness)
+- DO NOT add new features, unrelated refactors, or stylistic changes
+- DO NOT change the intent of the original code changes
+- Keep replacements minimal and focused
+- Only comment on changed lines (+ or - lines in the diff)
+- Skip lock files and minified files
+- If no issues are found, return an empty findings array
+
+## Output Format
+Return ONLY a JSON object. For every finding you MUST include:
+- "original": the EXACT original code to be replaced (must match the file verbatim)
+- "replacement": the EXACT replacement code
+
+{
+  "summary": "string - overall summary",
+  "findings": [
+    {
+      "severity": "CRITICAL|HIGH|MEDIUM|LOW",
+      "file": "path/to/file",
+      "line": 123,
+      "description": "What the issue is",
+      "rationale": "Why this matters",
+      "original": "exact original code",
+      "replacement": "exact replacement code"
     }
   ]
 }`;

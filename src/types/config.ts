@@ -69,4 +69,8 @@ export interface ReviewConfig {
   postAsComment: boolean;
   /** Fail on critical findings */
   failOnCritical: boolean;
+  /** Auto-apply vibe review fixes */
+  vibeReview: boolean;
+  /** Custom vibe review prompt (optional, overrides default) */
+  vibeReviewPrompt?: string;
 }

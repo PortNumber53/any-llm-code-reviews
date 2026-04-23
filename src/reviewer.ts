@@ -113,6 +113,8 @@ export function validateFindings(findings: unknown[]): Finding[] {
       description: finding.description,
       suggestion: typeof finding.suggestion === 'string' ? finding.suggestion : undefined,
       rationale: typeof finding.rationale === 'string' ? finding.rationale : undefined,
+      original: typeof finding.original === 'string' ? finding.original : undefined,
+      replacement: typeof finding.replacement === 'string' ? finding.replacement : undefined,
     });
   }
 

@@ -13,9 +13,11 @@ import { GitLabApiClient } from './gitlab-api.js';
 import type { DiffRefs } from './types/gitlab.js';
 import { createProvider } from './providers/index.js';
 import { filterDiff, validateFindings, hasCriticalFindings } from './reviewer.js';
+import { applyFixes, commitAndPushIfInCI } from './applier.js';
 import type { AppConfig } from './types/config.js';
 import type { ReviewResult, Finding, SEVERITY_EMOJI } from './types/reviewer.js';
 import type { LLMProviderClient, LLMProviderConfig } from './types/llm.js';
+import { REVIEW_PROMPT, VIBE_REVIEW_PROMPT } from './types/llm.js';
 
 const COMMENT_MARKER = '<!-- niteni-review -->';
 
@@ -77,7 +79,10 @@ export async function runPullRequestReview(config: AppConfig): Promise<ReviewRes
   const provider = createProvider(config.llm.provider, providerConfig);
 
   console.log(`[review] Calling ${config.llm.provider} for review...`);
-  const response = await provider.reviewDiff(diffContent, '');
+  const systemPrompt = config.review.vibeReview
+    ? (config.review.vibeReviewPrompt || VIBE_REVIEW_PROMPT)
+    : REVIEW_PROMPT;
+  const response = await provider.reviewDiff(diffContent, systemPrompt);
 
   if (response.error) {
     throw new Error(`LLM review failed: ${response.error}`);
@@ -98,6 +103,20 @@ export async function runPullRequestReview(config: AppConfig): Promise<ReviewRes
 
   if (response.truncated) {
     console.warn('[review] WARNING: LLM response was truncated. Some findings may be missing.');
+  }
+
+  // 5b. Vibe review — auto-apply fixes
+  if (config.review.vibeReview && findings.length > 0) {
+    console.log('[vibe] Auto-applying fixes...');
+    const applyResult = applyFixes(findings);
+    console.log(`[vibe] Applied ${applyResult.applied} fix(es) across ${applyResult.files.length} file(s)`);
+    if (applyResult.skipped > 0) {
+      console.log(`[vibe] Skipped ${applyResult.skipped} fix(es)`);
+    }
+    for (const err of applyResult.errors) {
+      console.warn(`[vibe] ${err}`);
+    }
+    commitAndPushIfInCI();
   }
 
   // 6. Post review to GitHub
@@ -188,7 +207,10 @@ export async function runMergeRequestReview(config: AppConfig): Promise<ReviewRe
   const provider = createProvider(config.llm.provider, providerConfig);
 
   console.log(`[review] Calling ${config.llm.provider} for review...`);
-  const response = await provider.reviewDiff(diffContent, '');
+  const systemPrompt = config.review.vibeReview
+    ? (config.review.vibeReviewPrompt || VIBE_REVIEW_PROMPT)
+    : REVIEW_PROMPT;
+  const response = await provider.reviewDiff(diffContent, systemPrompt);
 
   if (response.error) {
     throw new Error(`LLM review failed: ${response.error}`);
@@ -209,6 +231,20 @@ export async function runMergeRequestReview(config: AppConfig): Promise<ReviewRe
 
   if (response.truncated) {
     console.warn('[review] WARNING: LLM response was truncated. Some findings may be missing.');
+  }
+
+  // 5b. Vibe review — auto-apply fixes
+  if (config.review.vibeReview && findings.length > 0) {
+    console.log('[vibe] Auto-applying fixes...');
+    const applyResult = applyFixes(findings);
+    console.log(`[vibe] Applied ${applyResult.applied} fix(es) across ${applyResult.files.length} file(s)`);
+    if (applyResult.skipped > 0) {
+      console.log(`[vibe] Skipped ${applyResult.skipped} fix(es)`);
+    }
+    for (const err of applyResult.errors) {
+      console.warn(`[vibe] ${err}`);
+    }
+    commitAndPushIfInCI();
   }
 
   // 6. Post review to GitLab
@@ -323,7 +359,10 @@ export async function runDiffReview(
   const provider = createProvider(config.llm.provider, providerConfig);
 
   console.log(`[review] Calling ${config.llm.provider} for review...`);
-  const response = await provider.reviewDiff(diffContent, '');
+  const systemPrompt = config.review.vibeReview
+    ? (config.review.vibeReviewPrompt || VIBE_REVIEW_PROMPT)
+    : REVIEW_PROMPT;
+  const response = await provider.reviewDiff(diffContent, systemPrompt);
 
   if (response.error) {
     throw new Error(`LLM review failed: ${response.error}`);
@@ -337,6 +376,20 @@ export async function runDiffReview(
   const summary = typeof rawResponse.summary === 'string' ? rawResponse.summary : 'No summary';
   const findings = Array.isArray(rawResponse.findings) ? validateFindings(rawResponse.findings) : [];
   const hasCritical = hasCriticalFindings(findings);
+
+  // Vibe review — auto-apply fixes locally
+  if (config.review.vibeReview && findings.length > 0) {
+    console.log('[vibe] Auto-applying fixes...');
+    const applyResult = applyFixes(findings);
+    console.log(`[vibe] Applied ${applyResult.applied} fix(es) across ${applyResult.files.length} file(s)`);
+    if (applyResult.skipped > 0) {
+      console.log(`[vibe] Skipped ${applyResult.skipped} fix(es)`);
+    }
+    for (const err of applyResult.errors) {
+      console.warn(`[vibe] ${err}`);
+    }
+    commitAndPushIfInCI();
+  }
 
   return {
     summary,
@@ -359,6 +412,10 @@ function buildReviewComment(
 
   lines.push(COMMENT_MARKER);
   lines.push(`## AI Code Review — ${config.llm.provider}/${config.llm.model}`);
+  if (config.review.vibeReview) {
+    lines.push('');
+    lines.push('> ✨ **Vibe Review enabled** — fixes were auto-applied to this branch where possible.');
+  }
   lines.push('');
   lines.push(summary);
   lines.push('');
@@ -474,6 +531,10 @@ function buildGitLabSummaryNote(
 
   lines.push(COMMENT_MARKER);
   lines.push(`## AI Code Review — ${config.llm.provider}/${config.llm.model}`);
+  if (config.review.vibeReview) {
+    lines.push('');
+    lines.push('> ✨ **Vibe Review enabled** — fixes were auto-applied to this branch where possible.');
+  }
   lines.push('');
   lines.push(summary);
   lines.push('');

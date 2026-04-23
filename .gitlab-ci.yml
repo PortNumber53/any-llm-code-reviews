@@ -23,21 +23,24 @@ ai-code-review:
     - if: $CI_MERGE_REQUEST_IID
   variables:
     PLATFORM: gitlab
-    # LLM Provider — set LLM_PROVIDER and the corresponding API key as CI/CD variables
-    # Option 1: NVIDIA NIM (default)
+    # --- REQUIRED CI/CD VARIABLES (Settings > CI/CD > Variables) ---
+    # GITLAB_TOKEN: Set a GitLab PAT or Project Access Token with 'api' scope.
+    #                CI_JOB_TOKEN alone has limited API access and cannot read MRs.
+    #                The tool uses GITLAB_TOKEN before falling back to CI_JOB_TOKEN.
+    #
+    # LLM API Key: Set the provider-specific API key (e.g. NVIDIA_API_KEY, GEMINI_API_KEY,
+    #              OPENAI_API_KEY, or ANTHROPIC_API_KEY).
+    #
+    # LLM Provider
     LLM_PROVIDER: nvidia
-    # Option 2: Google Gemini
-    # LLM_PROVIDER: gemini
-    # Option 3: OpenAI
-    # LLM_PROVIDER: openai
-    # Option 4: Anthropic
-    # LLM_PROVIDER: anthropic
-    LLM_TEMPERATURE: '0.2'
-    LLM_MAX_TOKENS: '8192'
-    REVIEW_MAX_FILES: '50'
-    REVIEW_MAX_DIFF_SIZE: '100000'
-    REVIEW_POST_AS_COMMENT: 'true'
-    REVIEW_FAIL_ON_CRITICAL: 'false'
+    # LLM_TEMPERATURE: '0.2'
+    # LLM_MAX_TOKENS: '8192'
+    # REVIEW_MAX_FILES: '50'
+    # REVIEW_MAX_DIFF_SIZE: '100000'
+    # REVIEW_POST_AS_COMMENT: 'true'
+    # REVIEW_FAIL_ON_CRITICAL: 'false'
+    # VIBE_REVIEW: '1'              # Uncomment to auto-apply fixes
+    # VIBE_REVIEW_PROMPT: ''        # Optional: custom prompt string or file path
   before_script:
     - apt-get update && apt-get install -y git
   script:

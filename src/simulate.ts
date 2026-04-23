@@ -8,7 +8,7 @@ import type { ReviewResult } from './types/reviewer.js';
 
 export async function runSimulate(): Promise<ReviewResult> {
   console.log('\n╔══════════════════════════════════════════════╗');
-  console.log('║   niteni-multi-llm — Simulation Mode        ║');
+  console.log('║   Any-LLM reviewer — Simulation Mode        ║');
   console.log('╚══════════════════════════════════════════════╝\n');
 
   const mockFindings = [

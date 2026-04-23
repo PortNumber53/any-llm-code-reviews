@@ -1,9 +1,14 @@
 // Configuration types
 export type LLMProvider = 'gemini' | 'nvidia' | 'openai' | 'anthropic';
+export type Platform = 'github' | 'gitlab';
 
 export interface AppConfig {
-  /** GitHub configuration */
-  github: GitHubConfig;
+  /** Platform (github or gitlab) */
+  platform: Platform;
+  /** GitHub configuration (when platform is github) */
+  github?: GitHubConfig;
+  /** GitLab configuration (when platform is gitlab) */
+  gitlab?: GitLabConfig;
   /** LLM provider configuration */
   llm: LLMConfig;
   /** Review settings */
@@ -21,6 +26,19 @@ export interface GitHubConfig {
   repo: string;
   /** Pull request number */
   pullNumber: number;
+}
+
+export interface GitLabConfig {
+  /** GitLab token (PAT or CI job token) */
+  token: string;
+  /** GitLab API base URL (v4) */
+  baseUrl: string;
+  /** Project namespace (group or username) */
+  namespace: string;
+  /** Project name */
+  project: string;
+  /** Merge request IID */
+  mergeRequestIid: number;
 }
 
 export interface LLMConfig {

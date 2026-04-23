@@ -2,9 +2,12 @@
  * CLI entry point — parses args and dispatches to the appropriate mode.
  *
  * Modes:
- *   --mode pr       (default) Review a GitHub pull request
+ *   --mode pr       (default) Review a GitHub pull request or GitLab merge request
  *   --mode diff     Review a local git diff
  *   --mode simulate Run with mock data (demo mode)
+ *
+ * Platform selection:
+ *   --platform github|gitlab   (or set PLATFORM env var)
  *
  * Provider selection:
  *   --provider nvidia|gemini|openai|anthropic   (or set LLM_PROVIDER env var)
@@ -12,45 +15,61 @@
  * Model override:
  *   --model <model-name>   (or set <PROVIDER>_MODEL env var)
  *
- * PR number:
+ * PR number (GitHub):
  *   --pr <number>   (or set GITHUB_PR_NUMBER env var)
+ *
+ * MR IID (GitLab):
+ *   --mr <iid>   (or set GITLAB_MR_IID / CI_MERGE_REQUEST_IID env var)
  *
  * Target branch (for diff mode):
  *   --target <branch>   (default: main)
  */
 
 import { loadConfig } from './config.js';
-import { runPullRequestReview, runDiffReview } from './index.js';
+import { runPullRequestReview, runMergeRequestReview, runDiffReview } from './index.js';
 import { SEVERITY_EMOJI } from './types/reviewer.js';
 import type { ReviewResult } from './types/reviewer.js';
 
 const VALID_MODES = ['pr', 'diff', 'simulate'];
 const VALID_PROVIDERS = ['gemini', 'nvidia', 'openai', 'anthropic'];
+const VALID_PLATFORMS = ['github', 'gitlab'];
 
 function printUsage(): void {
   console.log(`
-niteni-multi-llm — AI code review tool with multi-LLM support
+Any-LLM reviewer — AI code review tool with multi-LLM support
 
 Usage:
   node dist/cli.js [options]
 
 Modes:
-  --mode pr        Review a GitHub pull request (default)
+  --mode pr        Review a GitHub PR or GitLab MR (default)
   --mode diff      Review a local git diff
   --mode simulate  Run with mock data (demo)
 
 Options:
-  --provider <name>    LLM provider: nvidia (default), gemini, openai, anthropic
-  --model <model>      Model name (overrides env var)
-  --pr <number>        Pull request number
-  --target <branch>    Target branch for diff mode (default: main)
-  --help               Show this help
+  --platform <name>   Platform: github (default), gitlab
+  --provider <name>   LLM provider: nvidia (default), gemini, openai, anthropic
+  --model <model>     Model name (overrides env var)
+  --pr <number>       Pull request number (GitHub)
+  --mr <iid>          Merge request IID (GitLab)
+  --target <branch>   Target branch for diff mode (default: main)
+  --help              Show this help
 
-Environment Variables:
-  GITHUB_TOKEN                 GitHub PAT (required for PR mode)
+Environment Variables (GitHub):
+  GITHUB_TOKEN                 GitHub PAT (required for PR mode on GitHub)
   GITHUB_REPO_OWNER            Repository owner
   GITHUB_REPO_NAME             Repository name
   GITHUB_PR_NUMBER             PR number (can use --pr instead)
+
+Environment Variables (GitLab):
+  GITLAB_TOKEN                 GitLab PAT or CI job token (required for PR mode on GitLab)
+  GITLAB_NAMESPACE             Project namespace/group (or CI_PROJECT_NAMESPACE)
+  GITLAB_PROJECT               Project name (or CI_PROJECT_NAME)
+  GITLAB_MR_IID                Merge request IID (or CI_MERGE_REQUEST_IID, can use --mr)
+  GITLAB_API_URL               GitLab API v4 URL (or CI_API_V4_URL)
+
+Environment Variables (LLM):
+  PLATFORM                     Platform: github, gitlab
   LLM_PROVIDER                 Provider: nvidia, gemini, openai, anthropic
   NVIDIA_API_KEY               NVIDIA API key
   GEMINI_API_KEY               Google Gemini API key
@@ -71,10 +90,15 @@ Environment Variables:
   REVIEW_FAIL_ON_CRITICAL      Exit 1 on CRITICAL (default: false)
 
 Examples:
-  # Review PR #42 with NVIDIA Llama
+  # Review GitHub PR #42 with NVIDIA Llama
   NVIDIA_API_KEY=... GITHUB_TOKEN=... \\
   GITHUB_REPO_OWNER=myorg GITHUB_REPO_NAME=myrepo \\
   node dist/cli.js --mode pr --provider nvidia --pr 42
+
+  # Review GitLab MR !7 with OpenAI
+  OPENAI_API_KEY=... GITLAB_TOKEN=... \\
+  GITLAB_NAMESPACE=myorg GITLAB_PROJECT=myrepo \\
+  node dist/cli.js --mode pr --platform gitlab --provider openai --mr 7
 
   # Review local diff with OpenAI
   OPENAI_API_KEY=... node dist/cli.js --mode diff --provider openai --target main
@@ -109,7 +133,7 @@ function parseArgs(): Record<string, string | boolean> {
 
 async function runSimulate(): Promise<ReviewResult> {
   console.log('\n╔══════════════════════════════════════════════╗');
-  console.log('║   niteni-multi-llm — Simulation Mode        ║');
+  console.log('║   Any-LLM reviewer — Simulation Mode        ║');
   console.log('╚══════════════════════════════════════════════╝\n');
 
   const mockFindings = [
@@ -218,7 +242,11 @@ async function main(): Promise<void> {
     let result: ReviewResult;
 
     if (mode === 'pr') {
-      result = await runPullRequestReview(config);
+      if (config.platform === 'gitlab') {
+        result = await runMergeRequestReview(config);
+      } else {
+        result = await runPullRequestReview(config);
+      }
     } else {
       const target = (args.target as string) || 'main';
       result = await runDiffReview(config, target);

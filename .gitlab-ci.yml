@@ -1,19 +1,49 @@
-# You can override the included template(s) by including variable overrides
-# SAST customization: https://docs.gitlab.com/user/application_security/sast/#available-cicd-variables
-# Secret Detection customization: https://docs.gitlab.com/user/application_security/secret_detection/pipeline/configure/
-# Dependency Scanning customization: https://docs.gitlab.com/user/application_security/dependency_scanning/dependency_scanning_sbom/#customizing-analyzer-behavior
-# Container Scanning customization: https://docs.gitlab.com/user/application_security/container_scanning/#customizing-analyzer-behavior
-# Note that environment variables can be set in several places
-# See https://docs.gitlab.com/ci/variables/#cicd-variable-precedence
 stages:
-- test
-- secret-detection
+  - test
+  - review
+  - secret-detection
+
+# --- Security scanning (existing) ---
 sast:
   stage: test
 include:
-- template: Security/SAST.gitlab-ci.yml
-- template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
 variables:
   SECRET_DETECTION_ENABLED: 'true'
 secret_detection:
   stage: secret-detection
+
+# --- AI Code Review ---
+ai-code-review:
+  stage: review
+  image: node:20-slim
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_MERGE_REQUEST_IID
+  variables:
+    PLATFORM: gitlab
+    # LLM Provider — set LLM_PROVIDER and the corresponding API key as CI/CD variables
+    # Option 1: NVIDIA NIM (default)
+    LLM_PROVIDER: nvidia
+    # Option 2: Google Gemini
+    # LLM_PROVIDER: gemini
+    # Option 3: OpenAI
+    # LLM_PROVIDER: openai
+    # Option 4: Anthropic
+    # LLM_PROVIDER: anthropic
+    LLM_TEMPERATURE: '0.2'
+    LLM_MAX_TOKENS: '8192'
+    REVIEW_MAX_FILES: '50'
+    REVIEW_MAX_DIFF_SIZE: '100000'
+    REVIEW_POST_AS_COMMENT: 'true'
+    REVIEW_FAIL_ON_CRITICAL: 'false'
+  before_script:
+    - apt-get update && apt-get install -y git
+  script:
+    - npm ci && npm run build
+    - node dist/cli.js --mode pr --platform gitlab --mr $CI_MERGE_REQUEST_IID
+  artifacts:
+    reports:
+      dotenv: review-result.env
+    when: always

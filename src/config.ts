@@ -5,9 +5,10 @@
  * CLI args (--mode, --provider, etc.) override env vars.
  */
 
-import type { AppConfig, LLMProvider } from './types/config.js';
+import type { AppConfig, LLMProvider, Platform } from './types/config.js';
 
 const VALID_PROVIDERS: LLMProvider[] = ['gemini', 'nvidia', 'openai', 'anthropic'];
+const VALID_PLATFORMS: Platform[] = ['github', 'gitlab'];
 
 /**
  * Default model names per provider.
@@ -40,17 +41,48 @@ export function loadConfig(cliArgs: Record<string, string | boolean>): AppConfig
     );
   }
 
+  // Resolve platform
+  const platform = (cliArgs.platform as string || env('PLATFORM') || 'github') as Platform;
+  if (!VALID_PLATFORMS.includes(platform)) {
+    throw new Error(
+      `Invalid platform: ${platform}. Valid: ${VALID_PLATFORMS.join(', ')}`
+    );
+  }
+
   // Resolve API key based on provider
   const apiKey = resolveApiKey(provider);
 
-  // Parse GitHub context
-  const github = {
-    token: requiredEnv('GITHUB_TOKEN'),
-    baseUrl: env('GITHUB_API_URL') || 'https://api.github.com',
-    owner: requiredEnv('GITHUB_REPO_OWNER'),
-    repo: requiredEnv('GITHUB_REPO_NAME'),
-    pullNumber: parseInt((cliArgs.pr as string) || requiredEnv('GITHUB_PR_NUMBER'), 10),
-  };
+  // Parse platform-specific config
+  let github: AppConfig['github'];
+  let gitlab: AppConfig['gitlab'];
+
+  if (platform === 'github') {
+    github = {
+      token: requiredEnv('GITHUB_TOKEN'),
+      baseUrl: env('GITHUB_API_URL') || 'https://api.github.com',
+      owner: requiredEnv('GITHUB_REPO_OWNER'),
+      repo: requiredEnv('GITHUB_REPO_NAME'),
+      pullNumber: parseInt((cliArgs.pr as string) || requiredEnv('GITHUB_PR_NUMBER'), 10),
+    };
+  } else {
+    gitlab = {
+      token: env('GITLAB_TOKEN') || env('CI_JOB_TOKEN') || '',
+      baseUrl: env('GITLAB_API_URL') || env('CI_API_V4_URL') || 'https://gitlab.com/api/v4',
+      namespace: env('GITLAB_NAMESPACE') || env('CI_PROJECT_NAMESPACE') || '',
+      project: env('GITLAB_PROJECT') || env('CI_PROJECT_NAME') || '',
+      mergeRequestIid: parseInt((cliArgs.mr as string) || env('GITLAB_MR_IID') || env('CI_MERGE_REQUEST_IID') || '0', 10),
+    };
+
+    if (!gitlab.token) {
+      throw new Error('Missing GitLab token. Set GITLAB_TOKEN or run in GitLab CI (CI_JOB_TOKEN is auto-provided).');
+    }
+    if (!gitlab.namespace || !gitlab.project) {
+      throw new Error('Missing GitLab project info. Set GITLAB_NAMESPACE and GITLAB_PROJECT (or run in GitLab CI where CI_PROJECT_NAMESPACE and CI_PROJECT_NAME are auto-provided).');
+    }
+    if (!gitlab.mergeRequestIid) {
+      throw new Error('Missing GitLab MR IID. Set GITLAB_MR_IID (or CI_MERGE_REQUEST_IID) or use --mr <iid>.');
+    }
+  }
 
   // Parse LLM config
   const llm = {
@@ -75,7 +107,7 @@ export function loadConfig(cliArgs: Record<string, string | boolean>): AppConfig
     failOnCritical: env('REVIEW_FAIL_ON_CRITICAL') === 'true',
   };
 
-  return { github, llm, review };
+  return { platform, github, gitlab, llm, review };
 }
 
 /**

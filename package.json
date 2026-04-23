@@ -15,7 +15,8 @@
     "nvidia",
     "gemini",
     "openai",
-    "github"
+    "github",
+    "gitlab"
   ],
   "license": "MIT",
   "devDependencies": {

@@ -32,7 +32,7 @@ export class GitHubApiClient {
       Accept: 'application/vnd.github.v3+json',
       Authorization: `Bearer ${this.config.token}`,
       'Content-Type': 'application/json',
-      'User-Agent': 'niteni-multi-llm/0.1.0',
+      'User-Agent': 'any-llm-reviewer/0.1.0',
     };
   }
 
@@ -156,7 +156,7 @@ export class GitHubApiClient {
   }
 
   /**
-   * Clean up old niteni review comments from the bot.
+   * Clean up old review comments from the bot.
    */
   async cleanupOldReviews(): Promise<number> {
     let deleted = 0;

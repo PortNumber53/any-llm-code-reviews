@@ -19,7 +19,7 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
   nvidia: 'meta/llama-3.3-70b-instruct',
   openai: 'gpt-4o',
   anthropic: 'claude-sonnet-4-20250514',
-  openrouter: 'meta-llama/llama-3.3-70b-instruct:free',
+  openrouter: 'openrouter/free',
 };
 
 /**

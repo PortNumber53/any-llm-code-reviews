@@ -69,7 +69,7 @@ Add the following CI/CD variables in **Settings → CI/CD → Variables**:
 | Gemini     | `gemini-2.0-flash`                | `GEMINI_API_KEY`     | `https://generativelanguage.googleapis.com/v1beta` |
 | OpenAI     | `gpt-4o`                          | `OPENAI_API_KEY`     | `https://api.openai.com/v1`                     |
 | Anthropic  | `claude-sonnet-4-20250514`        | `ANTHROPIC_API_KEY`  | `https://api.anthropic.com/v1`                  |
-| OpenRouter | `meta-llama/llama-3.3-70b-instruct:free` | `OPENROUTER_API_KEY` | `https://openrouter.ai/api/v1`                  |
+| OpenRouter | `openrouter/free`                | `OPENROUTER_API_KEY` | `https://openrouter.ai/api/v1`                  |
 
 ### NVIDIA Models
 

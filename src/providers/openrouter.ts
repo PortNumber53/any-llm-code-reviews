@@ -5,6 +5,7 @@
  * with JSON mode for structured output.
  *
  * Popular models:
+ *   - openrouter/free (auto-selects a free model)
  *   - anthropic/claude-3.5-sonnet
  *   - openai/gpt-4o
  *   - google/gemini-2.0-flash-exp:free
@@ -17,6 +18,46 @@ import type { LLMProviderClient, LLMResponse, LLMProviderConfig } from '../types
 import { REVIEW_PROMPT, RESPONSE_SCHEMA } from '../types/llm.js';
 
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
+
+/**
+ * Extract JSON from a response that may be wrapped in markdown code blocks
+ * or surrounded by prose. Free models may not respect response_format.
+ */
+function extractJson(text: string): string | null {
+  // Try direct parse first
+  try {
+    JSON.parse(text);
+    return text;
+  } catch {
+    // continue
+  }
+
+  // Try extracting from ```json ... ``` blocks
+  const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+  if (codeBlockMatch) {
+    try {
+      JSON.parse(codeBlockMatch[1]);
+      return codeBlockMatch[1];
+    } catch {
+      // continue
+    }
+  }
+
+  // Try finding the first { ... } block (greedy outermost braces)
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    const candidate = text.slice(start, end + 1);
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // continue
+    }
+  }
+
+  return null;
+}
 
 export class OpenRouterProvider implements LLMProviderClient {
   readonly name = 'openrouter';
@@ -84,9 +125,10 @@ export class OpenRouterProvider implements LLMProviderClient {
       const truncated = finishReason === 'length';
 
       let parsedOutput;
-      try {
-        parsedOutput = JSON.parse(rawText);
-      } catch {
+      const jsonStr = extractJson(rawText);
+      if (jsonStr) {
+        parsedOutput = JSON.parse(jsonStr);
+      } else {
         return {
           rawText,
           truncated,

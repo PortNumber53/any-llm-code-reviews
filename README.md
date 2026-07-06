@@ -2,14 +2,14 @@
 
 AI-powered code review tool for **GitHub** pull requests and **GitLab** merge requests with multi-LLM support.
 Replicates [niteni](https://github.com/denyherianto/niteni)'s clean architecture,
-extended to support **NVIDIA NIM**, Google **Gemini**, **OpenAI**, and **Anthropic Claude**.
+extended to support **NVIDIA NIM**, Google **Gemini**, **OpenAI**, **Anthropic Claude**, and **OpenRouter**.
 
 The name _niteni_ comes from Javanese meaning "to observe carefully."
 
 ## Features
 
 - **2 platforms** — GitHub (PRs) and GitLab (MRs)
-- **4 LLM providers** — NVIDIA NIM (default), Gemini, OpenAI, Anthropic
+- **5 LLM providers** — NVIDIA NIM (default), Gemini, OpenAI, Anthropic, OpenRouter
 - **Structured output** — JSON schema enforcement for reliable findings
 - **Inline comments** — Posts findings with severity, file, line, and suggestions
 - **Diff filtering** — Include/exclude glob patterns, size limits
@@ -59,7 +59,7 @@ Add your API key as a repository secret (e.g., `NVIDIA_API_KEY`).
 **GitLab CI/CD:** The `.gitlab-ci.yml` already includes an `ai-code-review` job.
 Add the following CI/CD variables in **Settings → CI/CD → Variables**:
 - `GITLAB_TOKEN` — GitLab PAT with `api` scope
-- `NVIDIA_API_KEY` (or `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`)
+- `NVIDIA_API_KEY` (or `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`)
 
 ## Supported LLM Providers
 
@@ -69,6 +69,7 @@ Add the following CI/CD variables in **Settings → CI/CD → Variables**:
 | Gemini     | `gemini-2.0-flash`                | `GEMINI_API_KEY`     | `https://generativelanguage.googleapis.com/v1beta` |
 | OpenAI     | `gpt-4o`                          | `OPENAI_API_KEY`     | `https://api.openai.com/v1`                     |
 | Anthropic  | `claude-sonnet-4-20250514`        | `ANTHROPIC_API_KEY`  | `https://api.anthropic.com/v1`                  |
+| OpenRouter | `openrouter/free`                | `OPENROUTER_API_KEY` | `https://openrouter.ai/api/v1`                  |
 
 ### NVIDIA Models
 
@@ -102,7 +103,7 @@ Modes:
 
 Options:
   --platform <name>   Platform: github (default), gitlab
-  --provider <name>   LLM provider: nvidia (default), gemini, openai, anthropic
+  --provider <name>   LLM provider: nvidia (default), gemini, openai, anthropic, openrouter
   --model <model>     Model name (overrides env var)
   --pr <number>       Pull request number (GitHub)
   --mr <iid>          Merge request IID (GitLab)
@@ -124,11 +125,12 @@ Options:
 | `GITLAB_PROJECT`               | Required*| Project name (or `CI_PROJECT_NAME`)      |
 | `GITLAB_MR_IID`                | Required*| MR IID (or `CI_MERGE_REQUEST_IID`, can use `--mr`) |
 | `GITLAB_API_URL`               | *(auto)* | GitLab API v4 URL (or `CI_API_V4_URL`)   |
-| `LLM_PROVIDER`                 | `nvidia` | Provider: nvidia, gemini, openai, anthropic |
+| `LLM_PROVIDER`                 | `nvidia` | Provider: nvidia, gemini, openai, anthropic, openrouter |
 | `NVIDIA_API_KEY`               | —        | NVIDIA API key                           |
 | `GEMINI_API_KEY`               | —        | Google Gemini API key                    |
 | `OPENAI_API_KEY`               | —        | OpenAI API key                           |
 | `ANTHROPIC_API_KEY`            | —        | Anthropic API key                        |
+| `OPENROUTER_API_KEY`           | —        | OpenRouter API key                       |
 | `LLM_TEMPERATURE`              | `0.2`    | Generation temperature                   |
 | `LLM_MAX_TOKENS`               | `8192`   | Max output tokens                        |
 | `REVIEW_MAX_FILES`             | `50`     | Max files to review                      |
@@ -177,6 +179,7 @@ src/
     gemini.ts         Google Gemini REST API
     openai.ts         OpenAI chat completions
     anthropic.ts      Anthropic Messages API with tool use
+    openrouter.ts     OpenRouter (OpenAI-compatible, multi-provider access)
     index.ts          Provider factory
 ```
 

@@ -1,5 +1,5 @@
 // Configuration types
-export type LLMProvider = 'gemini' | 'nvidia' | 'openai' | 'anthropic';
+export type LLMProvider = 'gemini' | 'nvidia' | 'openai' | 'anthropic' | 'openrouter';
 export type Platform = 'github' | 'gitlab';
 
 export interface AppConfig {

@@ -8,6 +8,7 @@ import { NVIDIAProvider } from './nvidia.js';
 import { GeminiProvider } from './gemini.js';
 import { OpenAIProvider } from './openai.js';
 import { AnthropicProvider } from './anthropic.js';
+import { OpenRouterProvider } from './openrouter.js';
 
 export function createProvider(
   provider: LLMProvider,
@@ -22,9 +23,11 @@ export function createProvider(
       return new OpenAIProvider(config);
     case 'anthropic':
       return new AnthropicProvider(config);
+    case 'openrouter':
+      return new OpenRouterProvider(config);
     default:
       throw new Error(`Unknown LLM provider: ${provider}`);
   }
 }
 
-export { NVIDIAProvider, GeminiProvider, OpenAIProvider, AnthropicProvider };
+export { NVIDIAProvider, GeminiProvider, OpenAIProvider, AnthropicProvider, OpenRouterProvider };

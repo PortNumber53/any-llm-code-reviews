@@ -10,7 +10,7 @@
  *   --platform github|gitlab   (or set PLATFORM env var)
  *
  * Provider selection:
- *   --provider nvidia|gemini|openai|anthropic   (or set LLM_PROVIDER env var)
+ *   --provider nvidia|gemini|openai|anthropic|openrouter   (or set LLM_PROVIDER env var)
  *
  * Model override:
  *   --model <model-name>   Auto-detects provider from model name when possible.
@@ -41,7 +41,7 @@ import { SEVERITY_EMOJI } from './types/reviewer.js';
 import type { ReviewResult } from './types/reviewer.js';
 
 const VALID_MODES = ['pr', 'diff', 'simulate'];
-const VALID_PROVIDERS = ['gemini', 'nvidia', 'openai', 'anthropic'];
+const VALID_PROVIDERS = ['gemini', 'nvidia', 'openai', 'anthropic', 'openrouter'];
 const VALID_PLATFORMS = ['github', 'gitlab'];
 
 function printUsage(): void {
@@ -58,7 +58,7 @@ Modes:
 
 Options:
   --platform <name>            Platform: github (default), gitlab
-  --provider <name>            LLM provider: nvidia (default), gemini, openai, anthropic
+  --provider <name>            LLM provider: nvidia (default), gemini, openai, anthropic, openrouter
   --model <model>              Model name (auto-detects provider; overrides env var)
   --pr <number>                Pull request number (GitHub)
   --mr <iid>                   Merge request IID (GitLab)
@@ -72,6 +72,7 @@ Model Auto-Detection (--model auto-selects provider):
   Gemini:    gemini-*
   OpenAI:    gpt-*, o1, o3-*, chatgpt-*
   Anthropic: claude-*
+  OpenRouter: openrouter/*
 
 Environment Variables (GitHub):
   GITHUB_TOKEN                 GitHub PAT (required for PR mode on GitHub)
@@ -88,16 +89,19 @@ Environment Variables (GitLab):
 
 Environment Variables (LLM):
   PLATFORM                     Platform: github, gitlab
-  LLM_PROVIDER                 Provider: nvidia, gemini, openai, anthropic
+  LLM_PROVIDER                 Provider: nvidia, gemini, openai, anthropic, openrouter
   NVIDIA_API_KEY               NVIDIA API key
   GEMINI_API_KEY               Google Gemini API key
   OPENAI_API_KEY               OpenAI API key
   ANTHROPIC_API_KEY            Anthropic API key
+  OPENROUTER_API_KEY           OpenRouter API key
   NVIDIA_MODEL                 NVIDIA model name (default: meta/llama-3.3-70b-instruct)
   GEMINI_MODEL                 Gemini model name (default: gemini-2.0-flash)
   OPENAI_MODEL                 OpenAI model name (default: gpt-4o)
   ANTHROPIC_MODEL              Anthropic model name (default: claude-sonnet-4-20250514)
+  OPENROUTER_MODEL             OpenRouter model name (default: openrouter/free)
   NVIDIA_BASE_URL              Custom NVIDIA API URL
+  OPENROUTER_BASE_URL          Custom OpenRouter API URL
   LLM_TEMPERATURE              Temperature (default: 0.2)
   LLM_MAX_TOKENS               Max output tokens (default: 8192)
   REVIEW_MAX_FILES             Max files to review (default: 50)

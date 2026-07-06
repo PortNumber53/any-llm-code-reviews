@@ -15,23 +15,29 @@ jobs:
     if: github.event.pull_request.draft == false
 
     steps:
-      - name: Checkout code
+      - name: Checkout PR code
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.pull_request.base.repo.full_name }}
-          fetch-depth: 0  # Full history for better diff context
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Install dependencies and build
+      - name: Checkout any-llm-code-reviews
+        uses: actions/checkout@v4
+        with:
+          repository: PortNumber53/any-llm-code-reviews
+          path: any-llm-code-reviews
+
+      - name: Install dependencies and build review tool
+        working-directory: any-llm-code-reviews
         run: npm ci && npm run build
 
       - name: Run AI Code Review
+        working-directory: any-llm-code-reviews
         env:
-          # GitHub token (auto-provided in Actions)
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPO_OWNER: ${{ github.repository_owner }}
           GITHUB_REPO_NAME: ${{ github.event.repository.name }}
@@ -57,6 +63,11 @@ jobs:
           # LLM_PROVIDER: anthropic
           # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           # ANTHROPIC_MODEL: claude-sonnet-4-20250514
+
+          # Option 5: OpenRouter (access multiple providers via one API)
+          # LLM_PROVIDER: openrouter
+          # OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # OPENROUTER_MODEL: openrouter/free
 
           # Review settings
           LLM_TEMPERATURE: '0.2'

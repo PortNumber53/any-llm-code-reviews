@@ -8,7 +8,7 @@
 import type { AppConfig, LLMProvider, Platform } from './types/config.js';
 import { readFileSync } from 'node:fs';
 
-const VALID_PROVIDERS: LLMProvider[] = ['gemini', 'nvidia', 'openai', 'anthropic'];
+const VALID_PROVIDERS: LLMProvider[] = ['gemini', 'nvidia', 'openai', 'anthropic', 'openrouter'];
 const VALID_PLATFORMS: Platform[] = ['github', 'gitlab'];
 
 /**
@@ -19,6 +19,7 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
   nvidia: 'meta/llama-3.3-70b-instruct',
   openai: 'gpt-4o',
   anthropic: 'claude-sonnet-4-20250514',
+  openrouter: 'openrouter/free',
 };
 
 /**
@@ -36,6 +37,7 @@ function detectProviderFromModel(model: string): LLMProvider | null {
   if (/^gemini/i.test(model)) return 'gemini';
   if (/^(gpt|o[13]|chatgpt|text|davinci)/i.test(model)) return 'openai';
   if (/^claude/i.test(model)) return 'anthropic';
+  if (/^openrouter\//i.test(model)) return 'openrouter';
   // Unknown model name — fall through to --provider / LLM_PROVIDER / default
   return null;
 }
@@ -48,6 +50,7 @@ const DEFAULT_BASE_URLS: Record<LLMProvider, string> = {
   nvidia: 'https://integrate.api.nvidia.com/v1',
   openai: 'https://api.openai.com/v1',
   anthropic: 'https://api.anthropic.com/v1',
+  openrouter: 'https://openrouter.ai/api/v1',
 };
 
 /**
@@ -156,6 +159,7 @@ function resolveApiKey(provider: LLMProvider): string {
     nvidia: ['NVIDIA_API_KEY', 'NIM_API_KEY'],
     openai: ['OPENAI_API_KEY'],
     anthropic: ['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'],
+    openrouter: ['OPENROUTER_API_KEY'],
   };
 
   for (const key of providerKeyMap[provider]) {

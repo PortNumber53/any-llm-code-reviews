@@ -5,11 +5,11 @@
  * with JSON mode for structured output.
  *
  * Popular models:
- *   - openrouter/free
  *   - anthropic/claude-3.5-sonnet
  *   - openai/gpt-4o
- *   - google/gemini-2.0-flash
- *   - meta-llama/llama-3.3-70b-instruct
+ *   - google/gemini-2.0-flash-exp:free
+ *   - meta-llama/llama-3.3-70b-instruct:free
+ *   - mistralai/mistral-small-3.1-24b-instruct:free
  */
 
 import { httpRequest, parseUrl } from '../http.js';
@@ -91,7 +91,7 @@ export class OpenRouterProvider implements LLMProviderClient {
           rawText,
           truncated,
           finishReason,
-          error: 'Failed to parse JSON from OpenRouter response',
+          error: `Failed to parse JSON from OpenRouter response. Raw text (first 500 chars): ${rawText.slice(0, 500)}`,
         };
       }
 

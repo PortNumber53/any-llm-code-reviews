@@ -67,7 +67,7 @@ jobs:
           # Option 5: OpenRouter (access multiple providers via one API)
           # LLM_PROVIDER: openrouter
           # OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          # OPENROUTER_MODEL: openrouter/free
+          # OPENROUTER_MODEL: meta-llama/llama-3.3-70b-instruct:free
 
           # Review settings
           LLM_TEMPERATURE: '0.2'

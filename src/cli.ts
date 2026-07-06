@@ -99,7 +99,7 @@ Environment Variables (LLM):
   GEMINI_MODEL                 Gemini model name (default: gemini-2.0-flash)
   OPENAI_MODEL                 OpenAI model name (default: gpt-4o)
   ANTHROPIC_MODEL              Anthropic model name (default: claude-sonnet-4-20250514)
-  OPENROUTER_MODEL             OpenRouter model name (default: openrouter/free)
+  OPENROUTER_MODEL             OpenRouter model name (default: meta-llama/llama-3.3-70b-instruct:free)
   NVIDIA_BASE_URL              Custom NVIDIA API URL
   OPENROUTER_BASE_URL          Custom OpenRouter API URL
   LLM_TEMPERATURE              Temperature (default: 0.2)

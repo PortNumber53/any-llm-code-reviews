@@ -18,12 +18,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          repository: ${{ github.event.pull_request.base.repo.full_name }}
           fetch-depth: 0  # Full history for better diff context
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies and build
         run: npm ci && npm run build
